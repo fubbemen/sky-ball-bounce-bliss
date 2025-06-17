@@ -7,12 +7,13 @@ import { Pause, Play, RotateCcw } from 'lucide-react';
 interface ScoreBoardProps {
   scores: { left: number; right: number };
   gameTime: number;
+  gameMode: 'single' | 'two-player';
   onPause: () => void;
   onReset: () => void;
   isPaused: boolean;
 }
 
-const ScoreBoard = ({ scores, gameTime, onPause, onReset, isPaused }: ScoreBoardProps) => {
+const ScoreBoard = ({ scores, gameTime, gameMode, onPause, onReset, isPaused }: ScoreBoardProps) => {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -30,12 +31,16 @@ const ScoreBoard = ({ scores, gameTime, onPause, onReset, isPaused }: ScoreBoard
           
           <div className="text-center">
             <div className="text-lg font-mono text-gray-800">{formatTime(gameTime)}</div>
-            <div className="text-sm text-gray-600">Time</div>
+            <div className="text-sm text-gray-600">
+              {gameMode === 'single' ? '1P vs AI' : '2 Players'}
+            </div>
           </div>
           
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">{scores.right}</div>
-            <div className="text-sm text-gray-600">Player 2</div>
+            <div className="text-sm text-gray-600">
+              {gameMode === 'single' ? 'AI' : 'Player 2'}
+            </div>
           </div>
         </div>
         
@@ -57,7 +62,7 @@ const ScoreBoard = ({ scores, gameTime, onPause, onReset, isPaused }: ScoreBoard
             className="flex items-center space-x-1"
           >
             <RotateCcw size={16} />
-            <span>Reset</span>
+            <span>Menu</span>
           </Button>
         </div>
       </div>

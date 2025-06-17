@@ -2,7 +2,11 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 
-const GameControls = () => {
+interface GameControlsProps {
+  gameMode: 'single' | 'two-player';
+}
+
+const GameControls = ({ gameMode }: GameControlsProps) => {
   return (
     <Card className="absolute bottom-4 right-4 p-4 bg-white/90 backdrop-blur-sm">
       <div className="text-sm space-y-2">
@@ -13,12 +17,22 @@ const GameControls = () => {
             <div>W - Jump</div>
             <div>A - Left</div>
             <div>D - Right</div>
+            <div>S - Back</div>
           </div>
           <div>
-            <div className="font-semibold text-red-600">Player 2</div>
-            <div>↑ - Jump</div>
-            <div>← - Left</div>
-            <div>→ - Right</div>
+            <div className="font-semibold text-red-600">
+              {gameMode === 'single' ? 'AI Player' : 'Player 2'}
+            </div>
+            {gameMode === 'single' ? (
+              <div className="text-gray-500">Automatic</div>
+            ) : (
+              <>
+                <div>↑ - Jump</div>
+                <div>← - Left</div>
+                <div>→ - Right</div>
+                <div>↓ - Back</div>
+              </>
+            )}
           </div>
         </div>
       </div>

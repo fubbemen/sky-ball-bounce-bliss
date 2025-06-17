@@ -1,26 +1,28 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Player from './Player';
 import Ball from './Ball';
 import Trampoline from './Trampoline';
 
 interface GameCourtProps {
   gameState: 'playing' | 'paused';
+  gameMode: 'single' | 'two-player';
   onScore: (side: 'left' | 'right') => void;
 }
 
-const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
+const GameCourt = ({ gameState, gameMode, onScore }: GameCourtProps) => {
   const courtRef = useRef<HTMLDivElement>(null);
   const [courtDimensions, setCourtDimensions] = useState({ width: 800, height: 600 });
+  const gameLoopRef = useRef<number>();
+  const lastScoreTime = useRef<number>(0);
   
   // Game objects state with 3D positioning
   const [ball, setBall] = useState({
     x: 400,
     y: 300,
-    z: 0, // Height above ground
+    z: 0,
     vx: 0,
     vy: 0,
-    vz: 0, // Vertical velocity
+    vz: 0,
     radius: 15
   });
   
@@ -30,6 +32,53 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
   });
 
   const [keys, setKeys] = useState<Set<string>>(new Set());
+
+  // Stable scoring callback
+  const handleScore = useCallback((side: 'left' | 'right') => {
+    const now = Date.now();
+    if (now - lastScoreTime.current > 1000) { // Prevent rapid scoring
+      lastScoreTime.current = now;
+      onScore(side);
+    }
+  }, [onScore]);
+
+  // AI player logic for single player mode
+  const updateAIPlayer = useCallback((ball: any, rightPlayer: any) => {
+    if (gameMode !== 'single') return rightPlayer;
+    
+    const newRightPlayer = { ...rightPlayer };
+    
+    // Simple AI: move towards ball when it's on AI's side
+    if (ball.x > 400) {
+      const targetX = ball.x - 50;
+      const targetY = ball.y;
+      
+      if (Math.abs(newRightPlayer.x - targetX) > 10) {
+        newRightPlayer.vx = targetX > newRightPlayer.x ? 3 : -3;
+      } else {
+        newRightPlayer.vx *= 0.8;
+      }
+      
+      if (Math.abs(newRightPlayer.y - targetY) > 10) {
+        newRightPlayer.vy = targetY > newRightPlayer.y ? 3 : -3;
+      } else {
+        newRightPlayer.vy *= 0.8;
+      }
+      
+      // AI jumps when ball is close and high
+      if (Math.abs(ball.x - newRightPlayer.x) < 80 && 
+          Math.abs(ball.y - newRightPlayer.y) < 80 && 
+          ball.z < -20 && newRightPlayer.onGround) {
+        newRightPlayer.vz = -12;
+        newRightPlayer.onGround = false;
+      }
+    } else {
+      newRightPlayer.vx *= 0.9;
+      newRightPlayer.vy *= 0.9;
+    }
+    
+    return newRightPlayer;
+  }, [gameMode]);
 
   // Update court dimensions on resize
   useEffect(() => {
@@ -68,16 +117,16 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
     };
   }, []);
 
-  // Game physics loop with 3D mechanics
+  // Game physics loop with optimized performance
   useEffect(() => {
     if (gameState !== 'playing') return;
 
-    const gameLoop = setInterval(() => {
+    const gameLoop = () => {
       // Update player positions based on keys
       setPlayers(prev => {
         const newPlayers = { ...prev };
         
-        // Player 1 (WASD) - overhead controls
+        // Player 1 (WASD)
         if (keys.has('a')) newPlayers.left.vx = Math.max(newPlayers.left.vx - 1, -6);
         if (keys.has('d')) newPlayers.left.vx = Math.min(newPlayers.left.vx + 1, 6);
         if (keys.has('s')) newPlayers.left.vy = Math.min(newPlayers.left.vy + 1, 6);
@@ -90,16 +139,18 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
           }
         }
         
-        // Player 2 (Arrow keys) - overhead controls
-        if (keys.has('arrowleft')) newPlayers.right.vx = Math.max(newPlayers.right.vx - 1, -6);
-        if (keys.has('arrowright')) newPlayers.right.vx = Math.min(newPlayers.right.vx + 1, 6);
-        if (keys.has('arrowdown')) newPlayers.right.vy = Math.min(newPlayers.right.vy + 1, 6);
-        if (keys.has('arrowup')) {
-          if (newPlayers.right.onGround) {
-            newPlayers.right.vz = -12;
-            newPlayers.right.onGround = false;
-          } else {
-            newPlayers.right.vy = Math.max(newPlayers.right.vy - 1, -6);
+        // Player 2 (Arrow keys) or AI
+        if (gameMode === 'two-player') {
+          if (keys.has('arrowleft')) newPlayers.right.vx = Math.max(newPlayers.right.vx - 1, -6);
+          if (keys.has('arrowright')) newPlayers.right.vx = Math.min(newPlayers.right.vx + 1, 6);
+          if (keys.has('arrowdown')) newPlayers.right.vy = Math.min(newPlayers.right.vy + 1, 6);
+          if (keys.has('arrowup')) {
+            if (newPlayers.right.onGround) {
+              newPlayers.right.vz = -12;
+              newPlayers.right.onGround = false;
+            } else {
+              newPlayers.right.vy = Math.max(newPlayers.right.vy - 1, -6);
+            }
           }
         }
 
@@ -137,6 +188,11 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
             player.x = Math.max(player.x, courtDimensions.width / 2 + 40);
           }
         });
+
+        // Update AI player if in single player mode
+        if (gameMode === 'single') {
+          newPlayers.right = updateAIPlayer(ball, newPlayers.right);
+        }
         
         return newPlayers;
       });
@@ -173,9 +229,9 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
           // Check for scoring (ball stays on ground)
           if (Math.abs(newBall.vz) < 2 && Math.abs(newBall.vx) < 3 && Math.abs(newBall.vy) < 3) {
             if (newBall.x < courtDimensions.width / 2) {
-              onScore('right');
+              handleScore('right');
             } else {
-              onScore('left');
+              handleScore('left');
             }
             // Reset ball in center
             newBall = { 
@@ -210,7 +266,7 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
             
             newBall.vx = Math.cos(angle) * Math.cos(verticalAngle) * speed;
             newBall.vy = Math.sin(angle) * Math.cos(verticalAngle) * speed;
-            newBall.vz = Math.sin(verticalAngle) * speed - 3; // Add upward force
+            newBall.vz = Math.sin(verticalAngle) * speed - 3;
             
             // Move ball away from player
             const pushDistance = newBall.radius + 30;
@@ -225,45 +281,44 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
         
         return newBall;
       });
-    }, 16); // ~60 FPS
 
-    return () => clearInterval(gameLoop);
-  }, [gameState, keys, players, courtDimensions, onScore]);
+      gameLoopRef.current = requestAnimationFrame(gameLoop);
+    };
+
+    gameLoopRef.current = requestAnimationFrame(gameLoop);
+    return () => {
+      if (gameLoopRef.current) {
+        cancelAnimationFrame(gameLoopRef.current);
+      }
+    };
+  }, [gameState, keys, players, ball, courtDimensions, handleScore, gameMode, updateAIPlayer]);
 
   return (
     <div className="flex-1 p-4">
       <div 
         ref={courtRef}
-        className="relative w-full h-[600px] bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-lg shadow-2xl overflow-hidden border-4 border-white transform perspective-1000"
-        style={{ maxWidth: '800px', margin: '0 auto', perspective: '1000px' }}
+        className="relative w-full h-[600px] bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-lg shadow-2xl overflow-hidden border-4 border-white"
+        style={{ maxWidth: '800px', margin: '0 auto' }}
       >
-        {/* 3D Court visualization */}
-        <div className="absolute inset-0 transform-gpu">
-          {/* Court lines - overhead view */}
+        {/* Court lines and net - keep existing code */}
+        <div className="absolute inset-0">
           <div className="absolute left-0 top-0 w-full h-full">
-            {/* Center line */}
             <div className="absolute left-1/2 top-0 w-1 h-full bg-white transform -translate-x-1/2 opacity-80" />
-            
-            {/* Court boundary */}
             <div className="absolute inset-4 border-2 border-white rounded opacity-60" />
-            
-            {/* Service areas */}
             <div className="absolute left-4 top-1/4 w-1/2 h-1/2 border border-white opacity-40 transform -translate-x-4" />
             <div className="absolute right-4 top-1/4 w-1/2 h-1/2 border border-white opacity-40 transform translate-x-4" />
           </div>
 
-          {/* 3D Net visualization */}
           <div className="absolute left-1/2 top-0 transform -translate-x-1/2">
             <div className="w-4 h-full bg-gradient-to-b from-gray-300 to-gray-600 opacity-80" style={{
               background: 'repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(255,255,255,0.3) 8px, rgba(255,255,255,0.3) 12px)'
             }} />
-            {/* Net posts */}
             <div className="absolute -top-2 left-0 w-4 h-4 bg-gray-700 rounded-full" />
             <div className="absolute -bottom-2 left-0 w-4 h-4 bg-gray-700 rounded-full" />
           </div>
         </div>
 
-        {/* Trampolines - positioned for overhead view */}
+        {/* Trampolines */}
         <Trampoline x={150} y={450} />
         <Trampoline x={650} y={450} />
         <Trampoline x={150} y={150} />
@@ -272,13 +327,13 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
         {/* Players with 3D positioning */}
         <Player 
           x={players.left.x} 
-          y={players.left.y - players.left.z * 0.5} // Pseudo 3D shadow effect
+          y={players.left.y - players.left.z * 0.5}
           color="blue" 
           isJumping={!players.left.onGround}
         />
         <Player 
           x={players.right.x} 
-          y={players.right.y - players.right.z * 0.5} // Pseudo 3D shadow effect
+          y={players.right.y - players.right.z * 0.5}
           color="red" 
           isJumping={!players.right.onGround}
         />
@@ -300,9 +355,12 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
           style={{ left: `${ball.x}px`, top: `${ball.y}px` }}
         />
         
-        {/* Updated controls hint */}
+        {/* Controls hint */}
         <div className="absolute bottom-2 left-2 text-xs text-white bg-black/50 p-2 rounded">
-          Player 1: WASD (W=Jump/Forward) | Player 2: Arrows (↑=Jump/Forward)
+          {gameMode === 'single' ? 
+            'Player: WASD (W=Jump/Forward) | AI: Computer' : 
+            'Player 1: WASD (W=Jump/Forward) | Player 2: Arrows (↑=Jump/Forward)'
+          }
         </div>
       </div>
     </div>
