@@ -14,10 +14,11 @@ const GameControls = ({ gameMode }: GameControlsProps) => {
         <div className="grid grid-cols-2 gap-4 text-xs">
           <div>
             <div className="font-semibold text-blue-600">Player 1</div>
-            <div>W - Jump</div>
+            <div>Space - Jump</div>
+            <div>W - Up</div>
             <div>A - Left</div>
+            <div>S - Down</div>
             <div>D - Right</div>
-            <div>S - Back</div>
           </div>
           <div>
             <div className="font-semibold text-red-600">
@@ -27,10 +28,11 @@ const GameControls = ({ gameMode }: GameControlsProps) => {
               <div className="text-gray-500">Automatic</div>
             ) : (
               <>
-                <div>↑ - Jump</div>
+                <div>Shift - Jump</div>
+                <div>↑ - Up</div>
                 <div>← - Left</div>
+                <div>↓ - Down</div>
                 <div>→ - Right</div>
-                <div>↓ - Back</div>
               </>
             )}
           </div>

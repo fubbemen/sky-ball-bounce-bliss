@@ -126,30 +126,28 @@ const GameCourt = ({ gameState, gameMode, onScore }: GameCourtProps) => {
       setPlayers(prev => {
         const newPlayers = { ...prev };
         
-        // Player 1 (WASD)
+        // Player 1 (WASD for movement, Space for jump)
         if (keys.has('a')) newPlayers.left.vx = Math.max(newPlayers.left.vx - 1, -6);
         if (keys.has('d')) newPlayers.left.vx = Math.min(newPlayers.left.vx + 1, 6);
+        if (keys.has('w')) newPlayers.left.vy = Math.max(newPlayers.left.vy - 1, -6);
         if (keys.has('s')) newPlayers.left.vy = Math.min(newPlayers.left.vy + 1, 6);
-        if (keys.has('w')) {
+        if (keys.has(' ')) {
           if (newPlayers.left.onGround) {
             newPlayers.left.vz = -12;
             newPlayers.left.onGround = false;
-          } else {
-            newPlayers.left.vy = Math.max(newPlayers.left.vy - 1, -6);
           }
         }
         
-        // Player 2 (Arrow keys) or AI
+        // Player 2 (Arrow keys for movement, Right Shift for jump) or AI
         if (gameMode === 'two-player') {
           if (keys.has('arrowleft')) newPlayers.right.vx = Math.max(newPlayers.right.vx - 1, -6);
           if (keys.has('arrowright')) newPlayers.right.vx = Math.min(newPlayers.right.vx + 1, 6);
+          if (keys.has('arrowup')) newPlayers.right.vy = Math.max(newPlayers.right.vy - 1, -6);
           if (keys.has('arrowdown')) newPlayers.right.vy = Math.min(newPlayers.right.vy + 1, 6);
-          if (keys.has('arrowup')) {
+          if (keys.has('shift')) {
             if (newPlayers.right.onGround) {
               newPlayers.right.vz = -12;
               newPlayers.right.onGround = false;
-            } else {
-              newPlayers.right.vy = Math.max(newPlayers.right.vy - 1, -6);
             }
           }
         }
@@ -355,11 +353,11 @@ const GameCourt = ({ gameState, gameMode, onScore }: GameCourtProps) => {
           style={{ left: `${ball.x}px`, top: `${ball.y}px` }}
         />
         
-        {/* Controls hint */}
+        {/* Updated controls hint */}
         <div className="absolute bottom-2 left-2 text-xs text-white bg-black/50 p-2 rounded">
           {gameMode === 'single' ? 
-            'Player: WASD (W=Jump/Forward) | AI: Computer' : 
-            'Player 1: WASD (W=Jump/Forward) | Player 2: Arrows (↑=Jump/Forward)'
+            'Player: WASD=Move, Space=Jump | AI: Computer' : 
+            'Player 1: WASD=Move, Space=Jump | Player 2: Arrows=Move, Shift=Jump'
           }
         </div>
       </div>
