@@ -62,7 +62,7 @@ const GameCourt = ({ gameState, gameMode, onScore }: GameCourtProps) => {
       if (Math.abs(newRightPlayer.y - targetY) > 10) {
         newRightPlayer.vy = targetY > newRightPlayer.y ? 3 : -3;
       } else {
-        newRightPlayer.vy *= 0.8;
+        newRightPlayer.vy *= 0.9;
       }
       
       // AI jumps when ball is close and high
@@ -244,9 +244,21 @@ const GameCourt = ({ gameState, gameMode, onScore }: GameCourtProps) => {
           }
         }
         
-        // Net collision (3D)
-        if (Math.abs(newBall.x - courtDimensions.width / 2) < 15 && newBall.z > -80) {
-          newBall.vx *= -0.8;
+        // Improved net collision (3D) - only affects horizontal movement when ball is low
+        const netCenter = courtDimensions.width / 2;
+        const netThickness = 10;
+        
+        if (Math.abs(newBall.x - netCenter) < netThickness && newBall.z > -60) {
+          // Only bounce if moving towards the net and ball is low enough
+          if ((newBall.vx > 0 && newBall.x < netCenter) || (newBall.vx < 0 && newBall.x > netCenter)) {
+            newBall.vx *= -0.6;
+            // Push ball away from net to prevent sticking
+            if (newBall.x < netCenter) {
+              newBall.x = netCenter - netThickness;
+            } else {
+              newBall.x = netCenter + netThickness;
+            }
+          }
         }
         
         // Player collisions with 3D distance
