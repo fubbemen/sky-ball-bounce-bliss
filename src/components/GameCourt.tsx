@@ -11,20 +11,22 @@ interface GameCourtProps {
 
 const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
   const courtRef = useRef<HTMLDivElement>(null);
-  const [courtDimensions, setCourtDimensions] = useState({ width: 800, height: 400 });
+  const [courtDimensions, setCourtDimensions] = useState({ width: 800, height: 600 });
   
-  // Game objects state
+  // Game objects state with 3D positioning
   const [ball, setBall] = useState({
     x: 400,
-    y: 200,
+    y: 300,
+    z: 0, // Height above ground
     vx: 0,
     vy: 0,
+    vz: 0, // Vertical velocity
     radius: 15
   });
   
   const [players, setPlayers] = useState({
-    left: { x: 150, y: 300, vx: 0, vy: 0, onGround: true },
-    right: { x: 650, y: 300, vx: 0, vy: 0, onGround: true }
+    left: { x: 200, y: 400, z: 0, vx: 0, vy: 0, vz: 0, onGround: true },
+    right: { x: 600, y: 400, z: 0, vx: 0, vy: 0, vz: 0, onGround: true }
   });
 
   const [keys, setKeys] = useState<Set<string>>(new Set());
@@ -66,7 +68,7 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
     };
   }, []);
 
-  // Game physics loop
+  // Game physics loop with 3D mechanics
   useEffect(() => {
     if (gameState !== 'playing') return;
 
@@ -75,108 +77,146 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
       setPlayers(prev => {
         const newPlayers = { ...prev };
         
-        // Player 1 (WASD)
-        if (keys.has('a')) newPlayers.left.vx = Math.max(newPlayers.left.vx - 1, -8);
-        if (keys.has('d')) newPlayers.left.vx = Math.min(newPlayers.left.vx + 1, 8);
-        if (keys.has('w') && newPlayers.left.onGround) {
-          newPlayers.left.vy = -15;
-          newPlayers.left.onGround = false;
+        // Player 1 (WASD) - overhead controls
+        if (keys.has('a')) newPlayers.left.vx = Math.max(newPlayers.left.vx - 1, -6);
+        if (keys.has('d')) newPlayers.left.vx = Math.min(newPlayers.left.vx + 1, 6);
+        if (keys.has('s')) newPlayers.left.vy = Math.min(newPlayers.left.vy + 1, 6);
+        if (keys.has('w')) {
+          if (newPlayers.left.onGround) {
+            newPlayers.left.vz = -12;
+            newPlayers.left.onGround = false;
+          } else {
+            newPlayers.left.vy = Math.max(newPlayers.left.vy - 1, -6);
+          }
         }
         
-        // Player 2 (Arrow keys)
-        if (keys.has('arrowleft')) newPlayers.right.vx = Math.max(newPlayers.right.vx - 1, -8);
-        if (keys.has('arrowright')) newPlayers.right.vx = Math.min(newPlayers.right.vx + 1, 8);
-        if (keys.has('arrowup') && newPlayers.right.onGround) {
-          newPlayers.right.vy = -15;
-          newPlayers.right.onGround = false;
+        // Player 2 (Arrow keys) - overhead controls
+        if (keys.has('arrowleft')) newPlayers.right.vx = Math.max(newPlayers.right.vx - 1, -6);
+        if (keys.has('arrowright')) newPlayers.right.vx = Math.min(newPlayers.right.vx + 1, 6);
+        if (keys.has('arrowdown')) newPlayers.right.vy = Math.min(newPlayers.right.vy + 1, 6);
+        if (keys.has('arrowup')) {
+          if (newPlayers.right.onGround) {
+            newPlayers.right.vz = -12;
+            newPlayers.right.onGround = false;
+          } else {
+            newPlayers.right.vy = Math.max(newPlayers.right.vy - 1, -6);
+          }
         }
 
-        // Apply physics to both players
+        // Apply 3D physics to both players
         ['left', 'right'].forEach(side => {
           const player = newPlayers[side as keyof typeof newPlayers];
           
-          // Apply gravity
-          player.vy += 0.8;
+          // Apply gravity to Z axis
+          player.vz += 0.6;
           
           // Update position
           player.x += player.vx;
           player.y += player.vy;
+          player.z += player.vz;
           
           // Apply friction
-          player.vx *= 0.85;
+          player.vx *= 0.9;
+          player.vy *= 0.9;
           
-          // Ground collision
-          if (player.y >= 300) {
-            player.y = 300;
-            player.vy = 0;
+          // Ground collision (Z axis)
+          if (player.z >= 0) {
+            player.z = 0;
+            player.vz = 0;
             player.onGround = true;
           }
           
-          // Side boundaries
+          // Court boundaries
+          player.x = Math.max(30, Math.min(courtDimensions.width - 30, player.x));
+          player.y = Math.max(30, Math.min(courtDimensions.height - 30, player.y));
+          
+          // Net restriction (players can't cross the middle)
           if (side === 'left') {
-            player.x = Math.max(20, Math.min(380, player.x));
+            player.x = Math.min(player.x, courtDimensions.width / 2 - 40);
           } else {
-            player.x = Math.max(420, Math.min(780, player.x));
+            player.x = Math.max(player.x, courtDimensions.width / 2 + 40);
           }
         });
         
         return newPlayers;
       });
 
-      // Update ball physics
+      // Update ball physics with 3D mechanics
       setBall(prev => {
         let newBall = { ...prev };
         
-        // Apply gravity
-        newBall.vy += 0.5;
+        // Apply gravity to Z axis
+        newBall.vz += 0.4;
         
         // Update position
         newBall.x += newBall.vx;
         newBall.y += newBall.vy;
+        newBall.z += newBall.vz;
         
-        // Bounce off walls
+        // Bounce off side walls
         if (newBall.x <= newBall.radius || newBall.x >= courtDimensions.width - newBall.radius) {
           newBall.vx *= -0.8;
           newBall.x = newBall.x <= newBall.radius ? newBall.radius : courtDimensions.width - newBall.radius;
         }
         
+        // Bounce off front/back walls
+        if (newBall.y <= newBall.radius || newBall.y >= courtDimensions.height - newBall.radius) {
+          newBall.vy *= -0.8;
+          newBall.y = newBall.y <= newBall.radius ? newBall.radius : courtDimensions.height - newBall.radius;
+        }
+        
         // Ground collision and scoring
-        if (newBall.y >= courtDimensions.height - newBall.radius) {
-          newBall.y = courtDimensions.height - newBall.radius;
-          newBall.vy *= -0.6;
+        if (newBall.z >= 0) {
+          newBall.z = 0;
+          newBall.vz *= -0.7;
           
-          // Check for scoring
-          if (Math.abs(newBall.vy) < 2) {
+          // Check for scoring (ball stays on ground)
+          if (Math.abs(newBall.vz) < 2 && Math.abs(newBall.vx) < 3 && Math.abs(newBall.vy) < 3) {
             if (newBall.x < courtDimensions.width / 2) {
               onScore('right');
             } else {
               onScore('left');
             }
-            // Reset ball
-            newBall = { x: 400, y: 200, vx: (Math.random() - 0.5) * 10, vy: 0, radius: 15 };
+            // Reset ball in center
+            newBall = { 
+              x: courtDimensions.width / 2, 
+              y: courtDimensions.height / 2, 
+              z: -50,
+              vx: (Math.random() - 0.5) * 8, 
+              vy: (Math.random() - 0.5) * 8, 
+              vz: -5,
+              radius: 15 
+            };
           }
         }
         
-        // Net collision
-        if (Math.abs(newBall.x - courtDimensions.width / 2) < 5 && newBall.y > 250) {
-          newBall.vx *= -0.9;
+        // Net collision (3D)
+        if (Math.abs(newBall.x - courtDimensions.width / 2) < 15 && newBall.z > -80) {
+          newBall.vx *= -0.8;
         }
         
-        // Player collisions
+        // Player collisions with 3D distance
         const checkPlayerCollision = (player: any) => {
           const dx = newBall.x - player.x;
           const dy = newBall.y - player.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+          const dz = newBall.z - player.z;
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
           
-          if (distance < newBall.radius + 25) {
+          if (distance < newBall.radius + 30) {
+            // Calculate 3D hit angle
+            const speed = Math.sqrt(newBall.vx * newBall.vx + newBall.vy * newBall.vy + newBall.vz * newBall.vz) + 3;
             const angle = Math.atan2(dy, dx);
-            const speed = Math.sqrt(newBall.vx * newBall.vx + newBall.vy * newBall.vy) + 5;
-            newBall.vx = Math.cos(angle) * speed;
-            newBall.vy = Math.sin(angle) * speed;
+            const verticalAngle = Math.atan2(dz, Math.sqrt(dx * dx + dy * dy));
+            
+            newBall.vx = Math.cos(angle) * Math.cos(verticalAngle) * speed;
+            newBall.vy = Math.sin(angle) * Math.cos(verticalAngle) * speed;
+            newBall.vz = Math.sin(verticalAngle) * speed - 3; // Add upward force
             
             // Move ball away from player
-            newBall.x = player.x + Math.cos(angle) * (newBall.radius + 25);
-            newBall.y = player.y + Math.sin(angle) * (newBall.radius + 25);
+            const pushDistance = newBall.radius + 30;
+            newBall.x = player.x + Math.cos(angle) * pushDistance;
+            newBall.y = player.y + Math.sin(angle) * pushDistance;
+            newBall.z = player.z + dz / distance * pushDistance;
           }
         };
         
@@ -194,43 +234,75 @@ const GameCourt = ({ gameState, onScore }: GameCourtProps) => {
     <div className="flex-1 p-4">
       <div 
         ref={courtRef}
-        className="relative w-full h-96 bg-gradient-to-b from-blue-200 to-green-300 rounded-lg shadow-lg overflow-hidden border-4 border-white"
-        style={{ maxWidth: '800px', margin: '0 auto' }}
+        className="relative w-full h-[600px] bg-gradient-to-br from-green-400 via-green-500 to-green-600 rounded-lg shadow-2xl overflow-hidden border-4 border-white transform perspective-1000"
+        style={{ maxWidth: '800px', margin: '0 auto', perspective: '1000px' }}
       >
-        {/* Court decorations */}
-        <div className="absolute inset-0">
-          {/* Net */}
-          <div className="absolute left-1/2 top-64 w-2 h-32 bg-white transform -translate-x-1/2" />
-          
-          {/* Court lines */}
-          <div className="absolute left-0 top-80 w-full h-1 bg-white" />
-          <div className="absolute left-1/2 top-0 w-1 h-full bg-white transform -translate-x-1/2" />
+        {/* 3D Court visualization */}
+        <div className="absolute inset-0 transform-gpu">
+          {/* Court lines - overhead view */}
+          <div className="absolute left-0 top-0 w-full h-full">
+            {/* Center line */}
+            <div className="absolute left-1/2 top-0 w-1 h-full bg-white transform -translate-x-1/2 opacity-80" />
+            
+            {/* Court boundary */}
+            <div className="absolute inset-4 border-2 border-white rounded opacity-60" />
+            
+            {/* Service areas */}
+            <div className="absolute left-4 top-1/4 w-1/2 h-1/2 border border-white opacity-40 transform -translate-x-4" />
+            <div className="absolute right-4 top-1/4 w-1/2 h-1/2 border border-white opacity-40 transform translate-x-4" />
+          </div>
+
+          {/* 3D Net visualization */}
+          <div className="absolute left-1/2 top-0 transform -translate-x-1/2">
+            <div className="w-4 h-full bg-gradient-to-b from-gray-300 to-gray-600 opacity-80" style={{
+              background: 'repeating-linear-gradient(90deg, transparent, transparent 8px, rgba(255,255,255,0.3) 8px, rgba(255,255,255,0.3) 12px)'
+            }} />
+            {/* Net posts */}
+            <div className="absolute -top-2 left-0 w-4 h-4 bg-gray-700 rounded-full" />
+            <div className="absolute -bottom-2 left-0 w-4 h-4 bg-gray-700 rounded-full" />
+          </div>
         </div>
 
-        {/* Trampolines */}
-        <Trampoline x={100} y={320} />
-        <Trampoline x={700} y={320} />
+        {/* Trampolines - positioned for overhead view */}
+        <Trampoline x={150} y={450} />
+        <Trampoline x={650} y={450} />
+        <Trampoline x={150} y={150} />
+        <Trampoline x={650} y={150} />
         
-        {/* Players */}
+        {/* Players with 3D positioning */}
         <Player 
           x={players.left.x} 
-          y={players.left.y} 
+          y={players.left.y - players.left.z * 0.5} // Pseudo 3D shadow effect
           color="blue" 
           isJumping={!players.left.onGround}
         />
         <Player 
           x={players.right.x} 
-          y={players.right.y} 
+          y={players.right.y - players.right.z * 0.5} // Pseudo 3D shadow effect
           color="red" 
           isJumping={!players.right.onGround}
         />
         
-        {/* Ball */}
-        <Ball x={ball.x} y={ball.y} />
+        {/* Player shadows */}
+        <div 
+          className="absolute w-8 h-4 bg-black opacity-20 rounded-full transform -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${players.left.x}px`, top: `${players.left.y}px` }}
+        />
+        <div 
+          className="absolute w-8 h-4 bg-black opacity-20 rounded-full transform -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${players.right.x}px`, top: `${players.right.y}px` }}
+        />
         
-        {/* Controls hint */}
+        {/* Ball with 3D positioning and shadow */}
+        <Ball x={ball.x} y={ball.y - ball.z * 0.8} />
+        <div 
+          className="absolute w-4 h-2 bg-black opacity-30 rounded-full transform -translate-x-1/2 -translate-y-1/2"
+          style={{ left: `${ball.x}px`, top: `${ball.y}px` }}
+        />
+        
+        {/* Updated controls hint */}
         <div className="absolute bottom-2 left-2 text-xs text-white bg-black/50 p-2 rounded">
-          Player 1: WASD | Player 2: Arrow Keys
+          Player 1: WASD (W=Jump/Forward) | Player 2: Arrows (↑=Jump/Forward)
         </div>
       </div>
     </div>
